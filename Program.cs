@@ -1,11 +1,8 @@
-﻿using System.Diagnostics;
-using System.Text.RegularExpressions;
-using ExifLib;
-using MediaInfo;
-using MetadataExtractor.Formats.QuickTime;
+﻿using ExifLib;
+using ImageMagick;
 using MetadataExtractor;
-using TagLib;
-using static System.Runtime.InteropServices.JavaScript.JSType;
+using MetadataExtractor.Formats.QuickTime;
+using System.Text.RegularExpressions;
 
 namespace ExifDateRenamer
 {
@@ -103,9 +100,37 @@ namespace ExifDateRenamer
             {
                 return GetDateTimeTakenFromVideo(filePath);
             }
+            else if (fileExtension == ".heic")
+            {
+                return GetDateTimeOriginalFromHeic(filePath);
+            }
 
             return new DateTime(2001, 1, 1, 0, 0, 0);
         }
+
+        static DateTime GetDateTimeOriginalFromHeic(string filePath)
+        {
+            try
+            {
+                using (var image = new MagickImage(filePath))
+                {
+                    if (image.GetAttribute("EXIF:DateTimeOriginal") is string dateStr)
+                    {
+                        if (DateTime.TryParseExact(dateStr, "yyyy:MM:dd HH:mm:ss", null, System.Globalization.DateTimeStyles.None, out DateTime dateTaken))
+                        {
+                            return dateTaken;
+                        }
+                    }
+                }
+            }
+            catch (Exception)
+            {
+                // Ignore any exceptions while reading metadata
+            }
+
+            return new DateTime(2001, 1, 1, 0, 0, 0);
+        }
+
         static DateTime GetDateTimeOriginalFromExif(string filePath)
         {
             try
@@ -157,7 +182,7 @@ namespace ExifDateRenamer
                 string currentFilePath = entry.Key;
                 string originalFilePath = entry.Value;
 
-                if (System.IO.File.Exists(currentFilePath))
+                if (File.Exists(currentFilePath))
                 {
                     Console.WriteLine($"Renaming '{Path.GetFileName(currentFilePath)}' back to '{Path.GetFileName(originalFilePath)}'");
                     System.IO.File.Move(currentFilePath, originalFilePath);
