@@ -1,4 +1,4 @@
-# Rä-Parser
+# R-Parser
 EXIF Data Processor with Initial MOV/MP4 Support!
 
 Welcome! I am currently experimenting with a variety of different programs, which include an EXIF parser (in addition to a video metadata parser) and an end to end encryption scheme which is much hard.
