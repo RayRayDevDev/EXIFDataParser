@@ -330,7 +330,7 @@ namespace ExifDateRenamer
                     }
                     catch (Exception)
                     {
-                        // If there's an error, you can log it or print it to the console here
+
                     }
                 }
             }
