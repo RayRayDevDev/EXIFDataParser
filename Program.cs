@@ -1,5 +1,6 @@
 ﻿using ImageMagick;
 using MetadataExtractor;
+using MetadataExtractor.Formats.Exif;
 using MetadataExtractor.Formats.Png;
 using MetadataExtractor.Formats.QuickTime;
 using System.Text.RegularExpressions;
@@ -24,9 +25,7 @@ namespace ExifDateRenamer
 
                 Console.WriteLine("Do you want to recheck all file names? (y/n)");
                 string recheckChoice = Console.ReadLine();
-#pragma warning disable CS8602 // Dereference of a possibly null reference.
                 bool recheckAllFiles = recheckChoice.ToLower() == "y";
-#pragma warning restore CS8602 // Dereference of a possibly null reference.
 
                 Dictionary<string, string> originalFileNames = new Dictionary<string, string>();
                 int renamedFilesCount = RenameFilesBasedOnExifDate(folderPath, originalFileNames, recheckAllFiles);
@@ -84,33 +83,23 @@ namespace ExifDateRenamer
                 string newFilePath = Path.Combine(Path.GetDirectoryName(file), newFileName + Path.GetExtension(file));
                 bool conflictFound;
                 int conflictCounter = 0;
-                do
+                while (System.IO.File.Exists(newFilePath))
                 {
-                    conflictFound = false;
-                    if (System.IO.File.Exists(newFilePath))
+                    conflictCounter++;
+                    DateTime incrementedDate = fileDate.AddSeconds(conflictCounter);
+                    if (incrementedDate.Minute == fileDate.Minute && incrementedDate.Hour == fileDate.Hour && incrementedDate.Day == fileDate.Day)
                     {
-                        DateTime incrementedDate = fileDate.AddSeconds(1);
-                        if (incrementedDate.Minute == fileDate.Minute && incrementedDate.Hour == fileDate.Hour && incrementedDate.Day == fileDate.Day)
-                        {
-                            fileDate = incrementedDate;
-                            newFileName = fileDate.ToString("yyyy-MM-dd HH_mm_ss");
-                            newFilePath = Path.Combine(Path.GetDirectoryName(file), newFileName + Path.GetExtension(file));
-                            conflictFound = true;
-                            conflictCounter++;
-                        }
-                        else if (conflictCounter >= 59)
-                        {
-                            int counter = 1;
-                            while (System.IO.File.Exists(Path.Combine(Path.GetDirectoryName(file), newFileName + $" ({counter})" + Path.GetExtension(file))))
-                            {
-                                counter++;
-                            }
-                            newFilePath = Path.Combine(Path.GetDirectoryName(file), newFileName + $" ({counter})" + Path.GetExtension(file));
-                            conflictFound = false;
-                        }
+                        fileDate = incrementedDate;
+                        newFileName = fileDate.ToString("yyyy-MM-dd HH_mm_ss");
+                        newFilePath = Path.Combine(Path.GetDirectoryName(file), newFileName + Path.GetExtension(file));
                     }
-                } while (conflictFound);
-
+                    else if (conflictCounter >= 59)
+                    {
+                        // Reset the seconds to 0 and start incrementing again
+                        fileDate = fileDate.AddSeconds(-59);
+                        conflictCounter = 0;
+                    }
+                }
                 Console.WriteLine($"Renaming '{Path.GetFileName(file)}' to '{Path.GetFileName(newFilePath)}'");
                 try
                 {
@@ -130,6 +119,7 @@ namespace ExifDateRenamer
 
             return renamedFilesCount;
         }
+
         static DateTime GetFileDateTime(string filePath)
         {
             string fileExtension = Path.GetExtension(filePath).ToLower();
@@ -190,69 +180,15 @@ namespace ExifDateRenamer
         {
             try
             {
-                string fileExtension = Path.GetExtension(filePath).ToLower();
-                if (fileExtension == ".png")
+                var directories = ImageMetadataReader.ReadMetadata(filePath);
+                foreach (var directory in directories)
                 {
-                    // Read PNG metadata using MetadataExtractor
-                    var directories = ImageMetadataReader.ReadMetadata(filePath);
-                    DateTime minDate = DateTime.MaxValue;
-
-                    foreach (var directory in directories)
+                    if (directory is ExifSubIfdDirectory)
                     {
-                        if (directory is PngDirectory)
+                        if (directory.TryGetDateTime(ExifDirectoryBase.TagDateTimeOriginal, out DateTime dateTaken))
                         {
-                            foreach (var tag in directory.Tags)
-                            {
-                                if (tag.Name.Equals("tIME"))
-                                {
-                                    var regex = new Regex(@"(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})");
-                                    var match = regex.Match(tag.Description);
-                                    if (match.Success)
-                                    {
-                                        int year = int.Parse(match.Groups[1].Value);
-                                        int month = int.Parse(match.Groups[2].Value);
-                                        int day = int.Parse(match.Groups[3].Value);
-                                        int hour = int.Parse(match.Groups[4].Value);
-                                        int minute = int.Parse(match.Groups[5].Value);
-                                        int second = int.Parse(match.Groups[6].Value);
-
-                                        DateTime tempDate = new DateTime(year, month, day, hour, minute, second);
-                                        if (tempDate < minDate)
-                                        {
-                                            minDate = tempDate;
-                                        }
-                                    }
-                                }
-                            }
+                            return dateTaken;
                         }
-                        else if (directory.Name.Equals("PNG-iTXt"))
-                        {
-                            foreach (var tag in directory.Tags)
-                            {
-                                var regex = new Regex(@"(?:Creation Time|Modification Time):\s*(\d{4}):(\d{2}):(\d{2}) (\d{2}):(\d{2}):(\d{2})");
-                                var match = regex.Match(tag.Description);
-                                if (match.Success)
-                                {
-                                    int year = int.Parse(match.Groups[1].Value);
-                                    int month = int.Parse(match.Groups[2].Value);
-                                    int day = int.Parse(match.Groups[3].Value);
-                                    int hour = int.Parse(match.Groups[4].Value);
-                                    int minute = int.Parse(match.Groups[5].Value);
-                                    int second = int.Parse(match.Groups[6].Value);
-
-                                    DateTime tempDate = new DateTime(year, month, day, hour, minute, second);
-                                    if (tempDate < minDate)
-                                    {
-                                        minDate = tempDate;
-                                    }
-                                }
-                            }
-                        }
-                    }
-
-                    if (minDate != DateTime.MaxValue)
-                    {
-                        return minDate;
                     }
                 }
             }
@@ -275,9 +211,11 @@ namespace ExifDateRenamer
                 return new DateTime(2001, 1, 1, 0, 0, 0);
             }
         }
+    
 
 
-        static DateTime GetDateTimeTakenFromVideo(string filePath)
+
+    static DateTime GetDateTimeTakenFromVideo(string filePath)
         {
             try
             {
