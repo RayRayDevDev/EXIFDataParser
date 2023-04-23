@@ -1,4 +1,4 @@
-<Project Sdk="Microsoft.NET.Sdk">
+﻿<Project Sdk="Microsoft.NET.Sdk">
 
   <PropertyGroup>
     <OutputType>Exe</OutputType>
@@ -11,7 +11,7 @@
     <PackageReference Include="ExifLib" Version="1.7.0" />
     <PackageReference Include="Hjg.Pngcs" Version="1.1.4" />
     <PackageReference Include="LibHeifSharp" Version="3.0.0" />
-    <PackageReference Include="Magick.NET-Q16-AnyCPU" Version="13.0.1" />
+    <PackageReference Include="Magick.NET-Q16-AnyCPU" Version="13.1.0" />
     <PackageReference Include="MediaInfo" Version="1.0.1" />
     <PackageReference Include="MediaInfo.Core.Native" Version="21.9.1" />
     <PackageReference Include="MediaInfo.DotNetWrapper" Version="1.0.7" />
